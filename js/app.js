@@ -162,9 +162,61 @@
 ( function( global, doc, $, ns ) {
   'use strict';
   ns = ns || {};
+  var	instance;
+  var originalConstructor;
+
+  /*-------------------------------------------
+    PUBLIC
+  -------------------------------------------*/
+	function ResizeHandler(){
+    ns.EventDispatcher.call( this );
+ 	}
+
+  /*-------------------------------------------
+    INHERIT
+  -------------------------------------------*/
+  originalConstructor = ResizeHandler.prototype.constructor;
+  ResizeHandler.prototype = new ns.EventDispatcher();
+  ResizeHandler.prototype.constructor = originalConstructor;
+
+  /*-------------------------------------------
+    PRIVATE
+  -------------------------------------------*/
+  ResizeHandler.prototype.exec = function(){
+    var _this = this;
+    var throttle = new ns.Throttle( 200 );
+
+    $( global ).on( 'resize', function(){
+      throttle.exec( function(){
+        _this.fire( 'RESIZED', _this );
+      } );
+    } );
+  };
+
+  /*-------------------------------------------
+    EXPORT (singleton)
+  -------------------------------------------*/
+  function _getInstance(){
+    if (!instance) {
+      instance = new ResizeHandler();
+    }
+    return instance;
+  }
+
+  ns.ResizeHandler = {
+    getInstance: _getInstance
+  };
+
+	global.yahoo = ns;
+})( this, document, jQuery, this.yahoo );
+
+( function( global, doc, $, ns ) {
+  'use strict';
+  ns = ns || {};
   ns.soundTotal = 30;
 
   var	instance;
+  var originalConstructor;
   var sound = [];
   var timeout;
 
@@ -179,7 +231,16 @@
       sound.push( new Audio( 'audio/' + 
                              ( '00' + i ).slice( -2 ) + '.mp3' ) );
     }
+
+    ns.EventDispatcher.call( this );
  	}
+
+  /*-------------------------------------------
+    INHERIT
+  -------------------------------------------*/
+  originalConstructor = AudioPlayer.prototype.constructor;
+  AudioPlayer.prototype = new ns.EventDispatcher();
+  AudioPlayer.prototype.constructor = originalConstructor;
 
   /*-------------------------------------------
     PRIVATE
@@ -212,6 +273,7 @@
       }, 100 );
 
       this.lastPlayed = audio_index;
+      this.fire( 'AUDIO_PLAYED', this );
     }
   };
 
@@ -236,17 +298,72 @@
   'use strict';
   ns = ns || {};
 
+  var	instance;
+  var photo_total = 5;
+  /*-------------------------------------------
+    PUBLIC
+  -------------------------------------------*/
+	function Photo(){
+    this.currentPhoto = 0;
+    this.marginTop = 0;
+ 	}
+
+  /*-------------------------------------------
+    PRIVATE
+  -------------------------------------------*/
+  Photo.prototype.change = function(){
+    this.currentPhoto += 1;
+    if ( this.currentPhoto >= photo_total ){
+      this.currentPhoto = 0;
+    }
+    $( '<img>' ).attr( {
+      src: 'img/photo/' + ( '00' +
+           this.currentPhoto ).slice( -2 ) + '.jpg',
+      alt: '写真'
+    } ).
+    css( { marginTop: this.marginTop } ).
+    addClass( 'show' ).
+    appendTo( '#left .photo' );
+  };
+
+  Photo.prototype.setMargin = function( marginTop ){
+    this.marginTop = marginTop;
+  };
+
+  /*-------------------------------------------
+    EXPORT (singleton)
+  -------------------------------------------*/
+  function _getInstance(){
+    if (!instance) {
+      instance = new Photo();
+    }
+    return instance;
+  }
+
+  ns.Photo = {
+    getInstance: _getInstance
+  };
+
+	global.yahoo = ns;
+})( this, document, jQuery, this.yahoo );
+
+( function( global, doc, $, ns ) {
+  'use strict';
+  ns = ns || {};
+
   $(function() {
     var scrollHandler = ns.ScrollHandler.getInstance();
-    var audio         = ns.AudioPlayer.getInstance();
+    var audioPlayer   = ns.AudioPlayer.getInstance();
+    var photo         = ns.Photo.getInstance();
+    var resizeHandler = ns.ResizeHandler.getInstance();
+
+    var ball_offset;
+    var boardOn_offset;
+    var photo_offset;
 
     var $ball = $( '<p class="ball"></p>' );
-    var ball_offset = $( '#board-container .board' ).height();
-    var boardOn_offset = $( '#board-container .board' ).height() -
-                         $( '#board-container .board-on' ).height();
-    var photo_offset = ( $( '#left .photo img' ).height() - 200 ) / 2;
     var SCROLL_INTERVAL = 50;
-    var SOUND_TOTAL = 24;
+    var BOARD_TOTAL = 24;
     var i;
 
     /*--------------------------------
@@ -254,31 +371,53 @@
     --------------------------------*/
     scrollHandler.listen( 'SCROLLED', function( scrollTop ){
       var audio_index = Math.floor( scrollTop / SCROLL_INTERVAL ) - 1; 
-      audio.play( audio_index );
+      audioPlayer.play( audio_index );
     } );
+
+    audioPlayer.listen( 'AUDIO_PLAYED', function(){
+      photo.change();
+    } );
+
+    resizeHandler.listen( 'RESIZED', function(){
+      console.log( 1 );
+      _reset();
+    } );
+    /*--------------------------------
+      RESET 
+    --------------------------------*/
+    function _reset(){
+      ball_offset = $( '#board-container .board' ).height();
+      boardOn_offset = $( '#board-container .board' ).height() -
+                           $( '#board-container .board-on' ).height();
+      photo_offset = ( $( '#left .photo img' ).height() - 200 ) / 2;
+
+      // SET RIGHT CONTAINER
+      $( '#right .ball' ).remove();
+      for ( i = 0; i < ns.soundTotal; i++ ){
+        $ball.clone().
+          css( {
+            top: ball_offset + SCROLL_INTERVAL * ( i + 1 ),
+            left: ( 100 * Math.floor( Math.random() * 
+                  BOARD_TOTAL ) / BOARD_TOTAL ) + '%'
+          } ).
+          appendTo( '#right' );
+      }
+
+      photo.setMargin( -1 * photo_offset );
+      $( '#left .photo img' ).css( {
+        marginTop: -1 * photo_offset
+      } );
+      $( '#board-container .board-on' ).css( {
+        top: boardOn_offset
+      } );
+    }
 
     /*--------------------------------
       INIT
     --------------------------------*/
     scrollHandler.exec();
-
-    // SET LEFT CONTAINER
-    for ( i = 0; i < ns.soundTotal; i++ ){
-      $ball.clone().
-        css( {
-          top: ball_offset + SCROLL_INTERVAL * ( i + 1 ),
-          left: ( 100 * Math.floor( Math.random() * 
-                SOUND_TOTAL ) / SOUND_TOTAL ) + '%'
-        } ).
-        appendTo( '#right' );
-    }
-
-    $( '#left .photo img' ).css( {
-      marginTop: -1 * photo_offset
-    } );
-    $( '#board-container .board-on' ).css( {
-      top: boardOn_offset
-    } );
+    resizeHandler.exec();
+    _reset();
   });
   global.yahoo = ns;
 })( this, document, jQuery, this.yahoo );
