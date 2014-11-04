@@ -361,6 +361,11 @@
     var boardOn_offset;
     var photo_offset;
 
+    var board_on = new Image();
+    var board    = new Image();
+    var photo_img    = new Image();
+    var loadedImages = 0;
+
     var $ball = $( '<p class="ball"></p>' );
     var SCROLL_INTERVAL = 50;
     var BOARD_TOTAL = 24;
@@ -379,9 +384,9 @@
     } );
 
     resizeHandler.listen( 'RESIZED', function(){
-      console.log( 1 );
       _reset();
     } );
+
     /*--------------------------------
       RESET 
     --------------------------------*/
@@ -417,7 +422,33 @@
     --------------------------------*/
     scrollHandler.exec();
     resizeHandler.exec();
-    _reset();
+
+    // LOAD IMAGE BEFORE LAYOUT 
+    board.onload = function(){
+      $( board ).appendTo( '#board-container .board' );
+      _loadedImage();
+    };
+    board.src = 'img/orgel/board.jpg';
+
+    board_on.onload = function(){
+      $( board_on ).appendTo( '#board-container .board-on' );
+      _loadedImage();
+    };
+    board_on.src = 'img/orgel/board-on.png';
+
+    photo_img.onload = function(){
+      $( photo_img ).appendTo( '#left .photo' );
+      _loadedImage();
+    };
+    photo_img.src = 'img/photo/00.jpg';
+
+    function _loadedImage(){
+      loadedImages += 1;
+      if ( loadedImages === 3 ){
+        _reset();
+      }
+    }
+
   });
   global.yahoo = ns;
 })( this, document, jQuery, this.yahoo );
